@@ -228,4 +228,57 @@ operator << (std::ostream&    os,
     return os;
 }
 
+  void
+  AMRErrorTag::operator() (TagBoxArray&    tba,
+                           const MultiFab& mf,
+                           int             clearval,
+                           int             tagval,
+                           Real            time,
+                           int             level,
+                           const Geometry& geom) const
+  {
+    BL_PROFILE("AMRErrorTag_GRAD::operator()");
+
+    int  tag_max_level = MaxLevel();
+    Real tag_min_time = MinTime();
+    Real tag_max_time = MaxTime();
+    Real tag_value = Value();
+    bool tag_inbox = BoxTag();
+
+    if ((level < tag_max_level) &&
+        (tag_min_time < 0 || time >= tag_min_time) &&
+        (tag_max_time < 0 || time <= tag_max_time) )
+    {
+#ifdef _OPENMP
+#pragma omp parallel if (Gpu::notInLaunchRegion())
+#endif
+      for (MFIter mfi(mf,TilingIfNotGPU()); mfi.isValid(); ++mfi)
+      {
+        const Box& bx      = mfi.tilebox();
+        const auto dat     = mf.array(mfi);
+        Vector<int> itags  = tba[mfi].tags();
+        auto tag           = tba.array(mfi);
+
+        if (tag_inbox) {
+
+        }
+
+        amrex::ParallelFor(bx,
+        [=] AMREX_GPU_DEVICE (int i, int j, int k) noexcept
+        {
+          Real ax = amrex::Math::abs(dat(i+1,j,k) - dat(i,j,k));
+          Real ay = amrex::Math::abs(dat(i,j+1,k) - dat(i,j,k));
+          ax = amrex::max(ax,amrex::Math::abs(dat(i,j,k) - dat(i-1,j,k)));
+          ay = amrex::max(ay,amrex::Math::abs(dat(i,j,k) - dat(i,j-1,k)));
+#if AMREX_SPACEDIM > 2
+           Real az = amrex::Math::abs(dat(i,j,k+1) - dat(i,j,k));
+           az = amrex::max(az,amrex::Math::abs(dat(i,j,k) - dat(i,j,k-1)));
+#endif
+           if (amrex::max(D_DECL(ax,ay,az)) >= tag_value) {
+             tag(i,j,k) = tagval;
+           }
+        });
+      }
+    }
+  }
 }

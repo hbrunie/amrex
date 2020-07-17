@@ -8,8 +8,12 @@
 #include <AMReX_Vector.H>
 #include <AMReX_REAL.H>
 #include <AMReX_ArrayLim.H>
+#include <AMReX_MultiFab.H>
+#include <AMReX_TagBox.H>
+#include <AMReX_Geometry.H>
 
 namespace amrex {
+
 
 extern "C"
 {
@@ -372,6 +376,38 @@ private:
 
 std::ostream& operator << (std::ostream& os, const ErrorList& elst);
 
+  class AMRErrorTag
+  {
+  public:
+    AMRErrorTag (amrex::Real            value,
+                 int                    max_level = -1,
+                 amrex::Real            min_time =  1,
+                 amrex::Real            max_time = -1,
+                 const amrex::RealBox&  realbox = amrex::RealBox())
+      : m_value(value), m_min_time(min_time), m_max_time(max_time),
+        m_realbox(realbox), m_max_level(max_level) {}
+
+    virtual void operator() (amrex::TagBoxArray&    tb,
+                             const amrex::MultiFab& mf,
+                             int                    clearval,
+                             int                    tagval,
+                             amrex::Real            time,
+                             int                    level,
+                             const amrex::Geometry& geom) const;
+
+    amrex::Real Value() const {return m_value;}
+    int MaxLevel() const {return m_max_level;}
+    amrex::Real MinTime() const {return m_min_time;}
+    amrex::Real MaxTime() const {return m_max_time;}
+    amrex::RealBox RealBox() const {return m_realbox;}
+    bool BoxTag() const {return m_realbox.ok();}
+
+  protected:
+    amrex::Real m_value, m_min_time, m_max_time;
+    amrex::RealBox m_realbox;
+    int m_max_level;
+    bool m_is_boxtag;
+  };
 }
 
 #endif
