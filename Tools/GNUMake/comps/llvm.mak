@@ -71,8 +71,14 @@ ifeq ($(FSANITIZER),TRUE)
   GENERIC_COMP_FLAGS += -fsanitize=address -fsanitize=undefined
 endif
 
+ifeq ($(USE_CUDA),TRUE)
+LIBRARIES += -lcudart_static -ldl -lrt -pthread --cuda-gpu-arch=sm_70
+endif
+
 ifeq ($(USE_OMP),TRUE)
-  GENERIC_COMP_FLAGS += -fopenmp
+  ifneq ($(USE_CUDA),TRUE)
+    GENERIC_COMP_FLAGS += -fopenmp
+  endif
 endif
 
 CXXFLAGS += $(GENERIC_COMP_FLAGS) -pthread

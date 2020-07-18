@@ -657,30 +657,47 @@ else ifeq ($(USE_CUDA),TRUE)
 
     ifeq ($(lowercase_comp),pgi)
         LINK_WITH_FORTRAN_COMPILER=TRUE
+    	include $(AMREX_HOME)/Tools/GNUMake/comps/nvcc.mak
     else ifeq ($(lowercase_comp),ibm)
         LINK_WITH_FORTRAN_COMPILER=TRUE
+    	include $(AMREX_HOME)/Tools/GNUMake/comps/nvcc.mak
     else ifeq ($(lowercase_comp),gnu)
+    else ifeq ($(lowercase_comp),llvm)
+        ## Not sure ...
+        LINK_WITH_FORTRAN_COMPILER=FALSE
+        GENERIC_COMP_FLAGS += -DAMREX_USE_CLANG -lcudart_static -ldl -lr
+    	include $(AMREX_HOME)/Tools/GNUMake/comps/llvm.mak
     else
-        $(error CUDA can only be used with COMP=pgi or ibm or gnu)
+        $(error CUDA can only be used with COMP=pgi or ibm or gnu or llvm)
     endif
 
-    include $(AMREX_HOME)/Tools/GNUMake/comps/nvcc.mak
 
     ifeq ($(USE_MPI),TRUE)
       # Make sure that the C/C++ MPI
       # wrappers are calling nvcc to compile the code.
       # Right now we handle OpenMPI/Spectrum MPI and MPICH.
       # Other MPI implementations could be added later.
+      ifeq ($(COMP), clang)
+        export OMPI_CC := clang
+        export OMPI_CXX := clang++ -DAMREX_USE_CLANG
+        export OMPI_F77 := $(FC)
+        export OMPI_FC  := $(F90)
 
-      export OMPI_CC := nvcc
-      export OMPI_CXX := nvcc
-      export OMPI_F77 := $(FC)
-      export OMPI_FC  := $(F90)
+        export MPICH_CC  := clang
+        export MPICH_CXX := clang++
+        export MPICH_F77 := $(FC)
+        export MPICH_FC  := $(F90)
+      else
+        export OMPI_CC := nvcc
+        export OMPI_CXX := nvcc
+        export OMPI_F77 := $(FC)
+        export OMPI_FC  := $(F90)
 
-      export MPICH_CC  := nvcc
-      export MPICH_CXX := nvcc
-      export MPICH_F77 := $(FC)
-      export MPICH_FC  := $(F90)
+        export MPICH_CC  := nvcc
+        export MPICH_CXX := nvcc
+        export MPICH_F77 := $(FC)
+        export MPICH_FC  := $(F90)
+      endif
     endif
 
     DEFINES += -DAMREX_USE_CUDA
@@ -1037,8 +1054,12 @@ else ifeq ($(USE_CUDA),TRUE)
     DEFINES += -DAMREX_GPU_MAX_THREADS=$(CUDA_MAX_THREADS)
 
     ifneq ($(LINK_WITH_FORTRAN_COMPILER),TRUE)
-      LINKFLAGS = $(NVCC_FLAGS)
-      AMREX_LINKER = nvcc
+      ifeq ($(COMP), clang)
+        AMREX_LINKER = clang++
+      else
+        LINKFLAGS = $(NVCC_FLAGS)
+        AMREX_LINKER = nvcc
+      endif
     endif
 
     ifeq ($(nvcc_forward_unknowns),0)
